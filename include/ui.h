@@ -58,6 +58,12 @@ namespace UI {
     void setSmallFont();
     void setNormalFont();
     void setLargeFont();
+
+    // Brightness control (0-255)
+    void setBrightness(uint8_t level);
+    uint8_t getBrightness();
+    void loadBrightness();
+    void saveBrightness();
 }
 
 #endif

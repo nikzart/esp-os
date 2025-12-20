@@ -19,7 +19,9 @@ private:
         WIFI_SCAN,
         WIFI_PASSWORD,
         API_KEYS,
-        EDIT_API_KEY
+        EDIT_API_KEY,
+        BRIGHTNESS,
+        SLEEP_TIMEOUT
     };
 
     Mode mode = Mode::MENU;
@@ -32,12 +34,16 @@ private:
     char selectedSSID[33] = {0};
 
     int apiKeyIndex = 0;
+    uint8_t brightness = 255;
+    int sleepTimeoutIndex = 0;
 
     void loadSettings();
     void saveSettings();
     void renderMenu();
     void renderWifiList();
     void renderApiKeys();
+    void renderBrightness();
+    void renderSleepTimeout();
 };
 
 #endif

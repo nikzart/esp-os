@@ -25,10 +25,21 @@ public:
     typedef void (*ButtonCallback)(uint8_t btn, bool pressed);
     static void setCallback(ButtonCallback cb);
 
+    // Sleep management
+    static unsigned long getLastActivity();
+    static void resetActivity();
+    static void enterSleep();
+    static void loadSleepTimeout();
+    static void saveSleepTimeout(int index);
+    static int getSleepTimeoutIndex();
+    static unsigned long getSleepTimeoutMs();
+
 private:
     static bool currentState[NUM_BUTTONS];
     static bool previousState[NUM_BUTTONS];
     static unsigned long lastDebounce[NUM_BUTTONS];
+    static unsigned long lastActivity;
+    static int sleepTimeoutIndex;
     static ButtonCallback callback;
     static const uint8_t buttonPins[NUM_BUTTONS];
 };

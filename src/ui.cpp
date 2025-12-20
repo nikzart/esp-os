@@ -1,7 +1,10 @@
 #include "ui.h"
 #include <Wire.h>
+#include <Preferences.h>
 
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
+
+static uint8_t currentBrightness = 255;
 
 namespace UI {
 
@@ -152,6 +155,30 @@ void setNormalFont() {
 
 void setLargeFont() {
     u8g2.setFont(u8g2_font_7x14_tf);
+}
+
+void setBrightness(uint8_t level) {
+    currentBrightness = level;
+    u8g2.setContrast(level);
+}
+
+uint8_t getBrightness() {
+    return currentBrightness;
+}
+
+void loadBrightness() {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    currentBrightness = prefs.getUChar("brightness", 255);
+    prefs.end();
+    u8g2.setContrast(currentBrightness);
+}
+
+void saveBrightness() {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putUChar("brightness", currentBrightness);
+    prefs.end();
 }
 
 }

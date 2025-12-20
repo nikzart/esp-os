@@ -66,6 +66,19 @@ const int appCount = sizeof(apps) / sizeof(apps[0]);
 AppState currentState = AppState::HOMESCREEN;
 App* currentApp = nullptr;
 
+// Boot animation helper
+void showBootProgress(int percent, const char* status) {
+    UI::clear();
+    UI::setLargeFont();
+    UI::drawCentered(22, "ESP32 OS");
+    UI::setNormalFont();
+    UI::drawProgressBar(14, 32, 100, 8, percent);
+    UI::setSmallFont();
+    UI::drawCentered(52, status);
+    UI::setNormalFont();
+    UI::flush();
+}
+
 // Button callback
 void onButtonEvent(uint8_t btn, bool pressed) {
     if (Keyboard::isActive()) {
@@ -115,32 +128,54 @@ void setup() {
     Serial.begin(115200);
     Serial.println("\n=== ESP32 Mini OS ===");
 
-    // Initialize components
+    // Initialize display first
     UI::init();
+    showBootProgress(10, "Display ready");
+    delay(100);
+
+    // Load saved brightness
+    UI::loadBrightness();
+    showBootProgress(20, "Settings loaded");
+    delay(100);
+
+    // Initialize input
     Input::init();
     Input::setCallback(onButtonEvent);
-    Keyboard::init();
-    WiFiManager::init();
+    Input::loadSleepTimeout();
+    showBootProgress(30, "Input ready");
+    delay(100);
 
-    // Show splash screen
-    UI::clear();
-    UI::drawCentered(25, "ESP32 OS");
-    UI::setSmallFont();
-    UI::drawCentered(40, "Loading...");
-    UI::setNormalFont();
-    UI::flush();
+    // Initialize keyboard
+    Keyboard::init();
+    showBootProgress(40, "Keyboard ready");
+    delay(100);
+
+    // Initialize WiFi
+    WiFiManager::init();
+    showBootProgress(50, "Connecting WiFi...");
 
     // Try auto-connect to WiFi
     Serial.println("Auto-connecting WiFi...");
     WiFiManager::autoConnect();
 
-    // Initialize homescreen (fetches time/weather if WiFi connected)
+    if (WiFiManager::isConnected()) {
+        showBootProgress(80, "WiFi connected");
+    } else {
+        showBootProgress(80, "WiFi offline");
+    }
+    delay(200);
+
+    // Initialize homescreen
+    showBootProgress(90, "Loading homescreen...");
     Homescreen::init();
+    delay(100);
 
     // Initialize launcher
     launcher.setApps(apps, appCount);
+    showBootProgress(100, "Ready!");
+    delay(300);
 
-    // Startup beep
+    // Startup beeps
     UI::beep(1000, 50);
     delay(100);
     UI::beep(1500, 50);
@@ -151,6 +186,19 @@ void setup() {
 void loop() {
     // Update input
     Input::update();
+
+    // Check for sleep timeout
+    unsigned long sleepMs = Input::getSleepTimeoutMs();
+    if (sleepMs > 0) {
+        unsigned long inactive = millis() - Input::getLastActivity();
+        if (inactive >= sleepMs) {
+            // Turn off display and enter deep sleep
+            u8g2.setPowerSave(1);
+            delay(100);
+            Input::enterSleep();
+            // Won't reach here - device will restart on wake
+        }
+    }
 
     // Update keyboard if active
     if (Keyboard::isActive()) {
