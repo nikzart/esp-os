@@ -371,9 +371,28 @@ Press `Ctrl+C` to exit the monitor.
 1. After successful upload, the device will restart automatically
 2. You'll see "ESP32 OS Loading..." on the display
 3. A startup beep confirms the buzzer is working
-4. The launcher screen will appear with app icons
+4. The **Homescreen** will appear showing time, date, and weather
 
-### 6.2 Button Controls
+### 6.2 Homescreen
+
+The homescreen is the main screen shown when the device starts.
+
+**Displays:**
+- Current time (synced via NTP when WiFi connected)
+- Current date
+- WiFi connection status
+- Weather for saved city (temperature and condition)
+
+**Controls:**
+- **Press any button**: Open the app launcher
+
+**Auto-refresh:**
+- Time updates every second
+- Weather updates every 10 minutes
+
+> **Note**: Time and weather require WiFi connection. Without WiFi, time shows "00:00" and weather shows "No WiFi".
+
+### 6.4 Button Controls
 
 | Button | Global Function | In Apps |
 |--------|-----------------|---------|
@@ -386,7 +405,7 @@ Press `Ctrl+C` to exit the monitor.
 | **C** | Secondary action | Varies by app |
 | **D** | Menu / Options | Varies by app |
 
-### 6.3 Launcher Navigation
+### 6.5 Launcher Navigation
 
 The launcher displays apps in a 4x4 grid:
 
@@ -404,9 +423,10 @@ The launcher displays apps in a 4x4 grid:
 
 - Use **D-Pad** to move the selection cursor
 - Press **A** to open the selected app
+- Press **B** to return to homescreen
 - The status bar shows WiFi status and current time
 
-### 6.4 Connecting to WiFi
+### 6.6 Connecting to WiFi
 
 1. Navigate to **Settings** app
 2. Select **WiFi**
@@ -426,17 +446,28 @@ The launcher displays apps in a 4x4 grid:
 
 ### 7.1 Weather App ☀
 
-Shows current weather for your configured city.
+Shows current weather for any city with search and memory.
 
 **Features:**
 - Current temperature (Celsius)
 - Weather condition (Clear, Cloudy, Rain, etc.)
 - Humidity percentage
-- Wind speed
+- Search for any city
+- Remembers last searched city (persists across reboots)
+- Default city: Kollam
 
 **Controls:**
-- **A**: Refresh weather data
+- **A**: Fetch/refresh weather data
 - **B**: Exit to launcher
+- **C**: Change city (opens keyboard)
+
+**How to Change City:**
+1. Press **C** to open the keyboard
+2. Current city is pre-filled for editing
+3. Type new city name using on-screen keyboard
+4. Press **C** on keyboard to confirm
+5. Weather automatically fetches for new city
+6. City is saved and remembered for next time
 
 **Requirements:**
 - WiFi connection
@@ -614,6 +645,12 @@ Configure device settings.
 3. **Display** - Brightness, contrast settings
 4. **Sound** - Enable/disable buzzer
 5. **About** - Device information
+6. **Restart** - Reboot the device
+
+**Controls:**
+- **UP/DOWN**: Navigate menu
+- **A**: Select option
+- **B**: Exit to launcher
 
 ---
 

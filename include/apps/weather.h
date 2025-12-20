@@ -15,7 +15,9 @@ public:
 private:
     bool loading = false;
     bool hasData = false;
-    char city[32] = "London";
+    bool searching = false;
+    char city[32] = "Kollam";
+    char searchBuffer[32] = "";
     float temp = 0;
     int humidity = 0;
     char description[32] = "";
@@ -23,6 +25,8 @@ private:
     unsigned long lastFetch = 0;
 
     void fetchWeather();
+    void loadCity();
+    void saveCity();
 };
 
 #endif

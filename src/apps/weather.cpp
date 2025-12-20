@@ -2,23 +2,50 @@
 #include "ui.h"
 #include "wifi_manager.h"
 #include "icons.h"
+#include "config.h"
+#include "keyboard.h"
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
 void WeatherApp::init() {
     hasData = false;
     loading = false;
+    searching = false;
     errorMsg[0] = '\0';
+    loadCity();
+}
 
-    // Load city from settings (use default from config if not set)
+void WeatherApp::loadCity() {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
-    prefs.getString("city", city, sizeof(city));
+    prefs.getString("weather_city", city, sizeof(city));
     if (strlen(city) == 0) strcpy(city, DEFAULT_CITY);
     prefs.end();
 }
 
+void WeatherApp::saveCity() {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putString("weather_city", city);
+    prefs.end();
+}
+
 void WeatherApp::update() {
+    // Check for keyboard input completion
+    if (searching) {
+        if (Keyboard::isConfirmed()) {
+            strncpy(city, Keyboard::getText(), sizeof(city) - 1);
+            city[sizeof(city) - 1] = '\0';
+            saveCity();
+            searching = false;
+            hasData = false;
+            fetchWeather();
+        } else if (Keyboard::isCancelled()) {
+            searching = false;
+        }
+        return;
+    }
+
     // Auto-refresh every 5 minutes
     if (hasData && millis() - lastFetch > 300000) {
         fetchWeather();
@@ -123,15 +150,21 @@ void WeatherApp::render() {
         UI::drawCentered(50, buf);
     }
 
-    UI::drawStatusBar("A:Refresh", "B:Back");
+    UI::drawStatusBar("A:Fetch C:City", "B:Back");
     UI::flush();
 }
 
 void WeatherApp::onButton(uint8_t btn, bool pressed) {
     if (!pressed) return;
 
-    if (btn == BTN_A || btn == BTN_C) {
+    if (btn == BTN_A) {
         fetchWeather();
+        UI::beep();
+    } else if (btn == BTN_C) {
+        // Open keyboard to search city
+        searching = true;
+        strcpy(searchBuffer, city);
+        Keyboard::show("Enter city:", searchBuffer, sizeof(searchBuffer));
         UI::beep();
     } else if (btn == BTN_B || btn == BTN_D) {
         wantsToExit = true;
