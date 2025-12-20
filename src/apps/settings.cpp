@@ -82,7 +82,7 @@ void SettingsApp::render() {
 }
 
 void SettingsApp::renderMenu() {
-    const char* items[] = {"WiFi", "API Keys", "Sound: ON", "About"};
+    const char* items[] = {"WiFi", "API Keys", "Sound: ON", "Restart"};
     int count = 4;
 
     for (int i = 0; i < count; i++) {
@@ -163,6 +163,9 @@ void SettingsApp::onButton(uint8_t btn, bool pressed) {
                 } else if (menuIndex == 1) {
                     mode = Mode::API_KEYS;
                     apiKeyIndex = 0;
+                } else if (menuIndex == 3) {
+                    // Restart device
+                    ESP.restart();
                 }
             } else if (btn == BTN_B || btn == BTN_D) {
                 wantsToExit = true;

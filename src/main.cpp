@@ -7,6 +7,7 @@
 #include "app.h"
 #include "keyboard.h"
 #include "wifi_manager.h"
+#include "homescreen.h"
 
 // App includes
 #include "apps/launcher.h"
@@ -22,6 +23,7 @@
 #include "apps/quotes.h"
 #include "apps/iss.h"
 #include "apps/trivia.h"
+#include "apps/ota.h"
 
 // Global display (defined in ui.cpp)
 extern U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2;
@@ -40,6 +42,7 @@ JokesApp jokesApp;
 QuotesApp quotesApp;
 ISSApp issApp;
 TriviaApp triviaApp;
+OTAApp otaApp;
 
 // App list (excluding launcher)
 App* apps[] = {
@@ -54,12 +57,13 @@ App* apps[] = {
     &issApp,
     &triviaApp,
     &settingsApp,
-    &sysInfoApp
+    &sysInfoApp,
+    &otaApp
 };
 const int appCount = sizeof(apps) / sizeof(apps[0]);
 
 // Current state
-AppState currentState = AppState::LAUNCHER;
+AppState currentState = AppState::HOMESCREEN;
 App* currentApp = nullptr;
 
 // Button callback
@@ -69,7 +73,19 @@ void onButtonEvent(uint8_t btn, bool pressed) {
         return;
     }
 
-    if (currentState == AppState::LAUNCHER) {
+    if (currentState == AppState::HOMESCREEN) {
+        if (Homescreen::onButton(btn, pressed)) {
+            currentState = AppState::LAUNCHER;
+            launcher.init();
+        }
+    } else if (currentState == AppState::LAUNCHER) {
+        // B button goes back to homescreen
+        if (btn == BTN_B && pressed) {
+            UI::beep();
+            currentState = AppState::HOMESCREEN;
+            return;
+        }
+
         launcher.onButton(btn, pressed);
 
         // Check if launcher wants to launch an app
@@ -118,11 +134,11 @@ void setup() {
     Serial.println("Auto-connecting WiFi...");
     WiFiManager::autoConnect();
 
-    delay(1000);
+    // Initialize homescreen (fetches time/weather if WiFi connected)
+    Homescreen::init();
 
     // Initialize launcher
     launcher.setApps(apps, appCount);
-    launcher.init();
 
     // Startup beep
     UI::beep(1000, 50);
@@ -144,7 +160,10 @@ void loop() {
     }
 
     // Update and render based on state
-    if (currentState == AppState::LAUNCHER) {
+    if (currentState == AppState::HOMESCREEN) {
+        Homescreen::update();
+        Homescreen::render();
+    } else if (currentState == AppState::LAUNCHER) {
         launcher.update();
         launcher.render();
     } else if (currentState == AppState::APP_RUNNING && currentApp) {

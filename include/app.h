@@ -52,6 +52,7 @@ protected:
 
 // App state machine
 enum class AppState {
+    HOMESCREEN,
     LAUNCHER,
     APP_RUNNING,
     KEYBOARD_OVERLAY

@@ -39,11 +39,6 @@
 #define BEEP_FREQ 2000
 #define BEEP_DURATION 50
 
-// DHT11 Sensor
-#define DHT_PIN 17
-#define DHT_TYPE DHT11
-#define DHT_READ_INTERVAL 2000
-
 // NVS Namespace
 #define NVS_NAMESPACE "esp_os"
 
@@ -53,6 +48,6 @@
 #define DEFAULT_CITY "Kollam"
 
 // App count
-#define NUM_APPS 12
+#define NUM_APPS 13
 
 #endif
