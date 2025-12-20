@@ -21,7 +21,8 @@ private:
         API_KEYS,
         EDIT_API_KEY,
         BRIGHTNESS,
-        SLEEP_TIMEOUT
+        SLEEP_TIMEOUT,
+        TIME_SETTINGS
     };
 
     Mode mode = Mode::MENU;
@@ -36,6 +37,9 @@ private:
     int apiKeyIndex = 0;
     uint8_t brightness = 255;
     int sleepTimeoutIndex = 0;
+    int timezoneIndex = 1;  // Default IST
+    bool use24Hour = true;
+    int timeSettingIndex = 0;
 
     void loadSettings();
     void saveSettings();
@@ -44,6 +48,7 @@ private:
     void renderApiKeys();
     void renderBrightness();
     void renderSleepTimeout();
+    void renderTimeSettings();
 };
 
 #endif

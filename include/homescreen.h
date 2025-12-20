@@ -18,9 +18,12 @@ namespace Homescreen {
     
     // Sync time with NTP server
     void syncTime();
-    
+
     // Fetch weather data
     void fetchWeather();
+
+    // Load time settings from NVS
+    void loadTimeSettings();
 }
 
 #endif

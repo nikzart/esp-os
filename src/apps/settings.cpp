@@ -4,7 +4,17 @@
 #include "keyboard.h"
 #include "icons.h"
 #include "input.h"
+#include "homescreen.h"
 #include <Preferences.h>
+
+// Timezone data
+static const char* timezoneNames[] = {
+    "UTC", "IST +5:30", "EST -5", "CST -6", "MST -7", "PST -8", "CET +1", "JST +9"
+};
+static const long timezoneOffsets[] = {
+    0, 19800, -18000, -21600, -25200, -28800, 3600, 32400
+};
+static const int timezoneCount = 8;
 
 void SettingsApp::init() {
     mode = Mode::MENU;
@@ -19,6 +29,9 @@ void SettingsApp::loadSettings() {
     prefs.begin(NVS_NAMESPACE, true);
     prefs.getString("weather_key", weatherApiKey, sizeof(weatherApiKey));
     prefs.getString("news_key", newsApiKey, sizeof(newsApiKey));
+    timezoneIndex = prefs.getInt("timezone_idx", 1);  // Default IST
+    use24Hour = prefs.getBool("use_24hour", true);
+    if (timezoneIndex < 0 || timezoneIndex >= timezoneCount) timezoneIndex = 1;
     prefs.end();
 }
 
@@ -27,6 +40,8 @@ void SettingsApp::saveSettings() {
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putString("weather_key", weatherApiKey);
     prefs.putString("news_key", newsApiKey);
+    prefs.putInt("timezone_idx", timezoneIndex);
+    prefs.putBool("use_24hour", use24Hour);
     prefs.end();
 }
 
@@ -89,6 +104,10 @@ void SettingsApp::render() {
         case Mode::SLEEP_TIMEOUT:
             renderSleepTimeout();
             break;
+        case Mode::TIME_SETTINGS:
+            renderTimeSettings();
+            statusLeft = "L/R:Adj A:Save";
+            break;
         default:
             break;
     }
@@ -98,8 +117,8 @@ void SettingsApp::render() {
 }
 
 void SettingsApp::renderMenu() {
-    const char* items[] = {"WiFi", "API Keys", "Brightness", "Sleep", "Restart"};
-    int count = 5;
+    const char* items[] = {"WiFi", "API Keys", "Brightness", "Sleep", "Time", "Restart"};
+    int count = 6;
     int visibleCount = 3;  // Max items that fit before status bar
 
     // Calculate scroll offset to keep selection visible
@@ -218,6 +237,19 @@ void SettingsApp::renderSleepTimeout() {
     }
 }
 
+void SettingsApp::renderTimeSettings() {
+    UI::drawCentered(18, "Time Settings");
+
+    // Timezone selector
+    char tzLabel[24];
+    snprintf(tzLabel, sizeof(tzLabel), "Zone: %s", timezoneNames[timezoneIndex]);
+    UI::drawMenuItem(30, tzLabel, timeSettingIndex == 0);
+
+    // 12/24 hour toggle
+    const char* formatStr = use24Hour ? "Format: 24-hour" : "Format: 12-hour";
+    UI::drawMenuItem(42, formatStr, timeSettingIndex == 1);
+}
+
 void SettingsApp::onButton(uint8_t btn, bool pressed) {
     if (!pressed) return;
 
@@ -231,7 +263,7 @@ void SettingsApp::onButton(uint8_t btn, bool pressed) {
     switch (mode) {
         case Mode::MENU:
             if (btn == BTN_UP && menuIndex > 0) menuIndex--;
-            else if (btn == BTN_DOWN && menuIndex < 4) menuIndex++;
+            else if (btn == BTN_DOWN && menuIndex < 5) menuIndex++;
             else if (btn == BTN_A) {
                 if (menuIndex == 0) {
                     mode = Mode::WIFI_LIST;
@@ -246,6 +278,9 @@ void SettingsApp::onButton(uint8_t btn, bool pressed) {
                 } else if (menuIndex == 3) {
                     mode = Mode::SLEEP_TIMEOUT;
                 } else if (menuIndex == 4) {
+                    mode = Mode::TIME_SETTINGS;
+                    timeSettingIndex = 0;
+                } else if (menuIndex == 5) {
                     // Restart device
                     ESP.restart();
                 }
@@ -321,6 +356,36 @@ void SettingsApp::onButton(uint8_t btn, bool pressed) {
                 mode = Mode::MENU;
             } else if (btn == BTN_B) {
                 sleepTimeoutIndex = Input::getSleepTimeoutIndex();  // Restore original
+                mode = Mode::MENU;
+            }
+            break;
+
+        case Mode::TIME_SETTINGS:
+            if (btn == BTN_UP && timeSettingIndex > 0) timeSettingIndex--;
+            else if (btn == BTN_DOWN && timeSettingIndex < 1) timeSettingIndex++;
+            else if (btn == BTN_LEFT) {
+                if (timeSettingIndex == 0) {
+                    // Decrease timezone
+                    timezoneIndex = (timezoneIndex - 1 + timezoneCount) % timezoneCount;
+                } else {
+                    // Toggle time format
+                    use24Hour = !use24Hour;
+                }
+            } else if (btn == BTN_RIGHT) {
+                if (timeSettingIndex == 0) {
+                    // Increase timezone
+                    timezoneIndex = (timezoneIndex + 1) % timezoneCount;
+                } else {
+                    // Toggle time format
+                    use24Hour = !use24Hour;
+                }
+            } else if (btn == BTN_A) {
+                saveSettings();
+                Homescreen::loadTimeSettings();
+                Homescreen::syncTime();
+                mode = Mode::MENU;
+            } else if (btn == BTN_B) {
+                loadSettings();  // Restore original
                 mode = Mode::MENU;
             }
             break;

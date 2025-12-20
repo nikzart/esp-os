@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <time.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 
 extern U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2;
 
@@ -12,6 +13,14 @@ extern U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2;
 static bool timeSync = false;
 static unsigned long lastTimeSync = 0;
 static const unsigned long TIME_SYNC_INTERVAL = 3600000; // 1 hour
+
+// Time settings
+static int savedTimezoneIndex = 1;  // Default IST
+static bool savedUse24Hour = true;
+static const long timezoneOffsets[] = {
+    0, 19800, -18000, -21600, -25200, -28800, 3600, 32400
+};
+static const int timezoneCount = 8;
 
 // Weather data
 static char weatherTemp[8] = "--";
@@ -24,7 +33,19 @@ static const char* daysOfWeek[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sa
 static const char* months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", 
                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
+void Homescreen::loadTimeSettings() {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    savedTimezoneIndex = prefs.getInt("timezone_idx", 1);  // Default IST
+    savedUse24Hour = prefs.getBool("use_24hour", true);
+    if (savedTimezoneIndex < 0 || savedTimezoneIndex >= timezoneCount) savedTimezoneIndex = 1;
+    prefs.end();
+}
+
 void Homescreen::init() {
+    // Load time settings
+    loadTimeSettings();
+
     // Try to sync time if WiFi connected
     if (WiFiManager::isConnected()) {
         syncTime();
@@ -34,10 +55,14 @@ void Homescreen::init() {
 
 void Homescreen::syncTime() {
     if (!WiFiManager::isConnected()) return;
-    
-    // Configure NTP
-    configTime(19800, 0, "pool.ntp.org", "time.nist.gov"); // IST offset (5:30 = 19800 seconds)
-    
+
+    // Reload settings in case they changed
+    loadTimeSettings();
+
+    // Configure NTP with saved timezone
+    long offset = timezoneOffsets[savedTimezoneIndex];
+    configTime(offset, 0, "pool.ntp.org", "time.nist.gov");
+
     // Wait for time sync (max 5 seconds)
     struct tm timeinfo;
     int retry = 0;
@@ -45,7 +70,7 @@ void Homescreen::syncTime() {
         delay(500);
         retry++;
     }
-    
+
     if (retry < 10) {
         timeSync = true;
         lastTimeSync = millis();
@@ -105,13 +130,22 @@ void Homescreen::render() {
     bool hasTime = getLocalTime(&timeinfo);
     
     // Large time display
-    u8g2.setFont(u8g2_font_logisoso22_tn);
     if (hasTime) {
-        char timeStr[8];
-        snprintf(timeStr, sizeof(timeStr), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        char timeStr[12];
+        if (savedUse24Hour) {
+            u8g2.setFont(u8g2_font_logisoso22_tn);
+            snprintf(timeStr, sizeof(timeStr), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        } else {
+            u8g2.setFont(u8g2_font_logisoso18_tn);
+            int hour = timeinfo.tm_hour % 12;
+            if (hour == 0) hour = 12;
+            const char* ampm = timeinfo.tm_hour >= 12 ? "P" : "A";
+            snprintf(timeStr, sizeof(timeStr), "%2d:%02d%s", hour, timeinfo.tm_min, ampm);
+        }
         int w = u8g2.getStrWidth(timeStr);
         u8g2.drawStr((128 - w) / 2, 24, timeStr);
     } else {
+        u8g2.setFont(u8g2_font_logisoso22_tn);
         u8g2.drawStr(38, 24, "--:--");
     }
     
