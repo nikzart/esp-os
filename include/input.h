@@ -40,6 +40,7 @@ private:
     static unsigned long lastDebounce[NUM_BUTTONS];
     static unsigned long lastActivity;
     static int sleepTimeoutIndex;
+    static bool skipNextCallback;
     static ButtonCallback callback;
     static const uint8_t buttonPins[NUM_BUTTONS];
 };

@@ -192,11 +192,12 @@ void loop() {
     if (sleepMs > 0) {
         unsigned long inactive = millis() - Input::getLastActivity();
         if (inactive >= sleepMs) {
-            // Turn off display and enter deep sleep
+            // Turn off display and enter light sleep
             u8g2.setPowerSave(1);
             delay(100);
             Input::enterSleep();
-            // Won't reach here - device will restart on wake
+            // Continues here after wake from light sleep
+            u8g2.setPowerSave(0);
         }
     }
 

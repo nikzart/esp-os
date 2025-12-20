@@ -1,12 +1,14 @@
 #include "input.h"
 #include <Preferences.h>
 #include <esp_sleep.h>
+#include <driver/gpio.h>
 
 bool Input::currentState[NUM_BUTTONS] = {false};
 bool Input::previousState[NUM_BUTTONS] = {false};
 unsigned long Input::lastDebounce[NUM_BUTTONS] = {0};
 unsigned long Input::lastActivity = 0;
 int Input::sleepTimeoutIndex = 0;
+bool Input::skipNextCallback = false;
 Input::ButtonCallback Input::callback = nullptr;
 
 const uint8_t Input::buttonPins[NUM_BUTTONS] = {
@@ -47,9 +49,12 @@ void Input::update() {
                     lastActivity = now;
                 }
 
-                // Fire callback
-                if (callback) {
+                // Fire callback (skip if waking from sleep)
+                if (callback && !skipNextCallback) {
                     callback(i, reading);
+                } else if (skipNextCallback && !reading) {
+                    // Button released after wake - clear flag
+                    skipNextCallback = false;
                 }
             }
         }
@@ -114,22 +119,21 @@ void Input::saveSleepTimeout(int index) {
 }
 
 void Input::enterSleep() {
-    // Create bitmask for all button pins that support RTC wakeup
-    // Only GPIO 32, 33, 25, 26, 27, 14, 13, 4 can be used with ext1
-    // All our buttons are on RTC GPIOs
-    uint64_t wakeupMask = 0;
-    wakeupMask |= (1ULL << BTN_PIN_LEFT);   // GPIO 32
-    wakeupMask |= (1ULL << BTN_PIN_RIGHT);  // GPIO 33
-    wakeupMask |= (1ULL << BTN_PIN_UP);     // GPIO 25
-    wakeupMask |= (1ULL << BTN_PIN_DOWN);   // GPIO 26
-    wakeupMask |= (1ULL << BTN_PIN_A);      // GPIO 27
-    wakeupMask |= (1ULL << BTN_PIN_B);      // GPIO 14
-    wakeupMask |= (1ULL << BTN_PIN_C);      // GPIO 13
-    wakeupMask |= (1ULL << BTN_PIN_D);      // GPIO 4
+    // Enable GPIO wakeup on all buttons
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+        gpio_wakeup_enable((gpio_num_t)buttonPins[i], GPIO_INTR_LOW_LEVEL);
+    }
+    esp_sleep_enable_gpio_wakeup();
 
-    // Configure ext1 wakeup - wake when any button is LOW (pressed)
-    esp_sleep_enable_ext1_wakeup(wakeupMask, ESP_EXT1_WAKEUP_ALL_LOW);
+    // Enter light sleep (preserves state, no reboot)
+    esp_light_sleep_start();
 
-    // Enter deep sleep
-    esp_deep_sleep_start();
+    // Disable all wakeup sources after wake
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+        gpio_wakeup_disable((gpio_num_t)buttonPins[i]);
+    }
+
+    // Skip next button callback (the wake press)
+    skipNextCallback = true;
+    lastActivity = millis();
 }
