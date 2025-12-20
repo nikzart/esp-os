@@ -13,27 +13,29 @@ int Keyboard::cursorX = 0;
 int Keyboard::cursorY = 0;
 bool Keyboard::capsLock = false;
 bool Keyboard::symbolMode = false;
+bool Keyboard::inActionColumn = false;
 const char* Keyboard::prompt = "";
 
-// Keyboard layout
+// Keyboard layout - 4 rows, actions on right side
 static const char* rows[] = {
     "1234567890",
     "qwertyuiop",
     "asdfghjkl",
-    "zxcvbnm.-",
-    " @_"  // space, @, underscore (special row)
+    "zxcvbnm._"
 };
 
 static const char* symbolRows[] = {
     "!@#$%^&*()",
     "~`[]{}|\\;:",
     "'\",<>/?+=",
-    "-_.*@#$%&",
-    " @_"
+    "-_.*@#$%&"
 };
 
-static const int rowLengths[] = {10, 10, 9, 9, 3};
-static const int numRows = 5;
+static const int rowLengths[] = {10, 10, 9, 9};
+static const int numRows = 4;
+
+// Right column action labels
+static const char* actionLabels[] = {"CAP", "SPC", "OK", "DEL"};
 
 void Keyboard::init() {
     active = false;
@@ -57,6 +59,7 @@ void Keyboard::show(const char* p, char* buffer, int maxLen) {
     cursorY = 1;  // Start on QWERTY row
     capsLock = false;
     symbolMode = false;
+    inActionColumn = false;
 }
 
 void Keyboard::hide() {
@@ -77,7 +80,7 @@ void Keyboard::render() {
     u8g2.drawStr(2, 8, prompt);
 
     // Input box
-    u8g2.drawFrame(0, 10, 128, 12);
+    u8g2.drawFrame(0, 10, 100, 12);
     UI::setNormalFont();
 
     // Show input with cursor
@@ -90,15 +93,16 @@ void Keyboard::render() {
     const char** layout = symbolMode ? symbolRows : rows;
 
     int startY = 26;
-    int rowHeight = 8;
+    int rowHeight = 9;
+    int charStartX = 4;  // Left margin for characters
 
-    for (int row = 0; row < numRows - 1; row++) {
+    // Draw character rows
+    for (int row = 0; row < numRows; row++) {
         int y = startY + row * rowHeight;
         int len = rowLengths[row];
-        int startX = (128 - len * 10) / 2;
 
         for (int col = 0; col < len; col++) {
-            int x = startX + col * 10;
+            int x = charStartX + col * 10;
             char c = layout[row][col];
 
             if (capsLock && c >= 'a' && c <= 'z') {
@@ -107,8 +111,8 @@ void Keyboard::render() {
 
             char str[2] = {c, '\0'};
 
-            // Highlight selected
-            if (row == cursorY && col == cursorX) {
+            // Highlight selected character
+            if (!inActionColumn && row == cursorY && col == cursorX) {
                 u8g2.drawBox(x - 1, y - 6, 9, 8);
                 u8g2.setDrawColor(0);
                 u8g2.drawStr(x, y, str);
@@ -119,34 +123,41 @@ void Keyboard::render() {
         }
     }
 
-    // Bottom row: CAPS, SPACE, OK
-    int y = startY + 4 * rowHeight;
-    const char* labels[] = {"CAP", "SPC", "OK"};
-    int widths[] = {20, 40, 20};
-    int positions[] = {10, 44, 98};
+    // Draw right action column
+    int actionX = 106;
+    int actionWidth = 20;
 
-    for (int i = 0; i < 3; i++) {
-        int x = positions[i];
-        bool selected = (cursorY == 4 && cursorX == i);
+    for (int i = 0; i < numRows; i++) {
+        int y = startY + i * rowHeight;
+        bool selected = inActionColumn && (cursorY == i);
 
+        // Draw action button
         if (selected) {
-            u8g2.drawBox(x - 2, y - 6, widths[i], 8);
+            u8g2.drawBox(actionX - 1, y - 6, actionWidth, 8);
             u8g2.setDrawColor(0);
         }
 
-        if (i == 0 && capsLock) {
-            u8g2.drawStr(x, y, "cap");
-        } else if (i == 0 && symbolMode) {
-            u8g2.drawStr(x, y, "123");
-        } else {
-            u8g2.drawStr(x, y, labels[i]);
+        // Show appropriate label
+        const char* label = actionLabels[i];
+        if (i == 0) {
+            // CAP button - show mode
+            if (symbolMode) {
+                label = "ABC";
+            } else if (capsLock) {
+                label = "abc";
+            }
         }
+
+        u8g2.drawStr(actionX, y, label);
 
         if (selected) u8g2.setDrawColor(1);
     }
 
-    // Instructions
-    u8g2.drawStr(2, 63, "A:type B:del C:mode D:cancel");
+    // Draw separator line between chars and actions
+    u8g2.drawVLine(102, startY - 6, numRows * rowHeight);
+
+    // Status hints at bottom
+    u8g2.drawStr(2, 63, "A:sel B:back C:mode D:exit");
 
     UI::flush();
 }
@@ -159,47 +170,72 @@ void Keyboard::onButton(uint8_t btn, bool pressed) {
     switch (btn) {
         case BTN_UP:
             cursorY = (cursorY - 1 + numRows) % numRows;
-            if (cursorX >= rowLengths[cursorY]) {
+            if (!inActionColumn && cursorX >= rowLengths[cursorY]) {
                 cursorX = rowLengths[cursorY] - 1;
             }
             break;
 
         case BTN_DOWN:
             cursorY = (cursorY + 1) % numRows;
-            if (cursorX >= rowLengths[cursorY]) {
+            if (!inActionColumn && cursorX >= rowLengths[cursorY]) {
                 cursorX = rowLengths[cursorY] - 1;
             }
             break;
 
         case BTN_LEFT:
-            cursorX = (cursorX - 1 + rowLengths[cursorY]) % rowLengths[cursorY];
+            if (inActionColumn) {
+                // Exit action column, go to last char of current row
+                inActionColumn = false;
+                cursorX = rowLengths[cursorY] - 1;
+            } else {
+                // Navigate left in character area
+                if (cursorX > 0) {
+                    cursorX--;
+                }
+            }
             break;
 
         case BTN_RIGHT:
-            cursorX = (cursorX + 1) % rowLengths[cursorY];
+            if (inActionColumn) {
+                // Wrap to first char of current row
+                inActionColumn = false;
+                cursorX = 0;
+            } else {
+                // Navigate right in character area
+                if (cursorX < rowLengths[cursorY] - 1) {
+                    cursorX++;
+                } else {
+                    // Enter action column
+                    inActionColumn = true;
+                }
+            }
             break;
 
         case BTN_A:  // Type character or select action
-            if (cursorY == 4) {
-                // Bottom row actions
-                if (cursorX == 0) {
-                    // Toggle caps/symbol
-                    if (symbolMode) {
-                        symbolMode = false;
-                    } else if (capsLock) {
-                        capsLock = false;
-                        symbolMode = true;
-                    } else {
-                        capsLock = true;
-                    }
-                } else if (cursorX == 1) {
-                    // Space
-                    typeChar(' ');
-                } else if (cursorX == 2) {
-                    // OK - confirm
-                    strncpy(outputBuffer, inputBuffer, maxLength);
-                    confirmed = true;
-                    active = false;
+            if (inActionColumn) {
+                // Action column
+                switch (cursorY) {
+                    case 0:  // CAP - Toggle caps/symbol
+                        if (symbolMode) {
+                            symbolMode = false;
+                        } else if (capsLock) {
+                            capsLock = false;
+                            symbolMode = true;
+                        } else {
+                            capsLock = true;
+                        }
+                        break;
+                    case 1:  // SPC - Space
+                        typeChar(' ');
+                        break;
+                    case 2:  // OK - Confirm
+                        strncpy(outputBuffer, inputBuffer, maxLength);
+                        confirmed = true;
+                        active = false;
+                        break;
+                    case 3:  // DEL - Backspace
+                        backspace();
+                        break;
                 }
             } else {
                 // Type character
@@ -241,7 +277,7 @@ const char* Keyboard::getText() {
 }
 
 char Keyboard::getChar(int x, int y) {
-    if (y >= numRows - 1 || x >= rowLengths[y]) return ' ';
+    if (y >= numRows || x >= rowLengths[y]) return ' ';
 
     const char** layout = symbolMode ? symbolRows : rows;
     char c = layout[y][x];

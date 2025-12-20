@@ -48,6 +48,7 @@ private:
     static int cursorY;
     static bool capsLock;
     static bool symbolMode;
+    static bool inActionColumn;
     static const char* prompt;
 
     static char getChar(int x, int y);

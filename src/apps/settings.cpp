@@ -65,6 +65,10 @@ void SettingsApp::render() {
     UI::clear();
     UI::drawTitleBar("Settings");
 
+    // Render content and get appropriate status bar text
+    const char* statusLeft = "A:Select";
+    const char* statusRight = "B:Back";
+
     switch (mode) {
         case Mode::MENU:
             renderMenu();
@@ -72,12 +76,15 @@ void SettingsApp::render() {
         case Mode::WIFI_LIST:
         case Mode::WIFI_SCAN:
             renderWifiList();
+            statusLeft = "A:Connect C:Scan";
             break;
         case Mode::API_KEYS:
             renderApiKeys();
+            statusLeft = "A:Edit";
             break;
         case Mode::BRIGHTNESS:
             renderBrightness();
+            statusLeft = "L/R:Adj A:Save";
             break;
         case Mode::SLEEP_TIMEOUT:
             renderSleepTimeout();
@@ -86,16 +93,30 @@ void SettingsApp::render() {
             break;
     }
 
-    UI::drawStatusBar("A:Select", "B:Back");
+    UI::drawStatusBar(statusLeft, statusRight);
     UI::flush();
 }
 
 void SettingsApp::renderMenu() {
     const char* items[] = {"WiFi", "API Keys", "Brightness", "Sleep", "Restart"};
     int count = 5;
+    int visibleCount = 3;  // Max items that fit before status bar
 
-    for (int i = 0; i < count; i++) {
-        UI::drawMenuItem(24 + i * 11, items[i], i == menuIndex);
+    // Calculate scroll offset to keep selection visible
+    int scrollOffset = 0;
+    if (menuIndex >= visibleCount) {
+        scrollOffset = menuIndex - visibleCount + 1;
+    }
+
+    // Render visible items
+    for (int i = 0; i < visibleCount && (i + scrollOffset) < count; i++) {
+        int itemIndex = i + scrollOffset;
+        UI::drawMenuItem(24 + i * 11, items[itemIndex], itemIndex == menuIndex);
+    }
+
+    // Draw scrollbar if needed
+    if (count > visibleCount) {
+        UI::drawScrollbar(125, 14, 38, scrollOffset, count, visibleCount);
     }
 }
 
@@ -135,53 +156,65 @@ void SettingsApp::renderApiKeys() {
         UI::drawMenuItem(24 + i * 11, items[i], i == apiKeyIndex);
     }
 
-    // Show current values (truncated)
+    // Show current values (moved up to avoid status bar)
     UI::setSmallFont();
     if (strlen(weatherApiKey) > 0) {
-        u8g2.drawStr(4, 50, "Weather: Set");
+        u8g2.drawStr(4, 46, "Weather: Set");
     } else {
-        u8g2.drawStr(4, 50, "Weather: Not set");
+        u8g2.drawStr(4, 46, "Weather: Not set");
     }
     if (strlen(newsApiKey) > 0) {
-        u8g2.drawStr(4, 58, "News: Set");
+        u8g2.drawStr(64, 46, "News: Set");
     } else {
-        u8g2.drawStr(4, 58, "News: Not set");
+        u8g2.drawStr(64, 46, "News: Not set");
     }
     UI::setNormalFont();
 }
 
 void SettingsApp::renderBrightness() {
-    UI::drawCentered(25, "Brightness");
+    UI::drawCentered(28, "Brightness");
 
     // Draw brightness bar
     int barWidth = 100;
     int barX = (SCREEN_WIDTH - barWidth) / 2;
-    UI::drawProgressBar(barX, 32, barWidth, 10, brightness * 100 / 255);
+    UI::drawProgressBar(barX, 36, barWidth, 10, brightness * 100 / 255);
 
     // Show percentage
     char buf[16];
     snprintf(buf, sizeof(buf), "%d%%", brightness * 100 / 255);
     UI::drawCentered(52, buf);
-
-    UI::setSmallFont();
-    UI::drawCentered(62, "L/R: Adjust  A: Save");
-    UI::setNormalFont();
+    // Hints moved to status bar
 }
 
 void SettingsApp::renderSleepTimeout() {
     const char* options[] = {"Off", "30 sec", "1 min", "2 min", "5 min"};
+    int count = 5;
+    int visibleCount = 3;
 
     UI::drawCentered(20, "Sleep Timeout");
 
-    for (int i = 0; i < 5; i++) {
-        int y = 32 + i * 9;
-        if (i == sleepTimeoutIndex) {
-            u8g2.drawBox(20, y - 7, 88, 9);
+    // Calculate scroll offset
+    int scrollOffset = 0;
+    if (sleepTimeoutIndex >= visibleCount) {
+        scrollOffset = sleepTimeoutIndex - visibleCount + 1;
+    }
+
+    // Render visible items
+    for (int i = 0; i < visibleCount && (i + scrollOffset) < count; i++) {
+        int itemIndex = i + scrollOffset;
+        int y = 32 + i * 10;
+        if (itemIndex == sleepTimeoutIndex) {
+            u8g2.drawBox(20, y - 8, 88, 10);
             u8g2.setDrawColor(0);
         }
-        int w = u8g2.getStrWidth(options[i]);
-        u8g2.drawStr((SCREEN_WIDTH - w) / 2, y, options[i]);
+        int w = u8g2.getStrWidth(options[itemIndex]);
+        u8g2.drawStr((SCREEN_WIDTH - w) / 2, y, options[itemIndex]);
         u8g2.setDrawColor(1);
+    }
+
+    // Draw scrollbar
+    if (count > visibleCount) {
+        UI::drawScrollbar(120, 24, 28, scrollOffset, count, visibleCount);
     }
 }
 
