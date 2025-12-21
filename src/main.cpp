@@ -25,6 +25,7 @@
 #include "apps/trivia.h"
 #include "apps/ota.h"
 #include "apps/timer.h"
+#include "apps/bulb.h"
 
 // Global display (defined in ui.cpp)
 extern U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2;
@@ -45,10 +46,12 @@ ISSApp issApp;
 TriviaApp triviaApp;
 OTAApp otaApp;
 TimerApp timerApp;
+BulbApp bulbApp;
 
 // App list (excluding launcher)
 App* apps[] = {
     &weatherApp,
+    &bulbApp,
     &cryptoApp,
     &newsApp,
     &snakeApp,
