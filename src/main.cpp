@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
 #include "config.h"
 #include "ui.h"
@@ -131,6 +133,9 @@ void onButtonEvent(uint8_t btn, bool pressed) {
 }
 
 void setup() {
+    // Disable brownout detection (prevents reset during WiFi power spikes on battery)
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
     Serial.begin(115200);
     Serial.println("\n=== ESP32 Mini OS ===");
 
