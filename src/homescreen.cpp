@@ -43,14 +43,8 @@ void Homescreen::loadTimeSettings() {
 }
 
 void Homescreen::init() {
-    // Load time settings
+    // Load time settings; defer NTP + weather until WiFi is up (handled in update())
     loadTimeSettings();
-
-    // Try to sync time if WiFi connected
-    if (WiFiManager::isConnected()) {
-        syncTime();
-        fetchWeather();
-    }
 }
 
 void Homescreen::syncTime() {
@@ -63,10 +57,10 @@ void Homescreen::syncTime() {
     long offset = timezoneOffsets[savedTimezoneIndex];
     configTime(offset, 0, "pool.ntp.org", "time.nist.gov");
 
-    // Wait for time sync (max 5 seconds)
+    // Wait for time sync (max 5 seconds total — pass 0 timeout so each poll is non-blocking)
     struct tm timeinfo;
     int retry = 0;
-    while (!getLocalTime(&timeinfo) && retry < 10) {
+    while (!getLocalTime(&timeinfo, 0) && retry < 10) {
         delay(500);
         retry++;
     }
@@ -107,19 +101,19 @@ void Homescreen::fetchWeather() {
 
 void Homescreen::update() {
     unsigned long now = millis();
-    
-    // Re-sync time periodically
-    if (timeSync && (now - lastTimeSync > TIME_SYNC_INTERVAL)) {
-        if (WiFiManager::isConnected()) {
+    static bool didInitialSync = false;
+
+    if (WiFiManager::isConnected()) {
+        if (!didInitialSync) {
             syncTime();
-        }
-    }
-    
-    // Re-fetch weather periodically
-    if (now - lastWeatherFetch > WEATHER_FETCH_INTERVAL) {
-        if (WiFiManager::isConnected()) {
             fetchWeather();
+            didInitialSync = true;
+            return;
         }
+        if (now - lastTimeSync > TIME_SYNC_INTERVAL) syncTime();
+        if (now - lastWeatherFetch > WEATHER_FETCH_INTERVAL) fetchWeather();
+    } else {
+        didInitialSync = false;  // re-arm so we sync immediately on reconnect
     }
 }
 
@@ -127,7 +121,8 @@ void Homescreen::render() {
     UI::clear();
     
     struct tm timeinfo;
-    bool hasTime = getLocalTime(&timeinfo);
+    // Pass 0 timeout: do not block render if NTP hasn't synced yet
+    bool hasTime = getLocalTime(&timeinfo, 0);
     
     // Large time display
     if (hasTime) {

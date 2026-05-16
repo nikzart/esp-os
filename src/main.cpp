@@ -161,20 +161,12 @@ void setup() {
     showBootProgress(40, "Keyboard ready");
     delay(100);
 
-    // Initialize WiFi
+    // Initialize WiFi (auto-connect runs asynchronously in loop())
     WiFiManager::init();
-    showBootProgress(50, "Connecting WiFi...");
-
-    // Try auto-connect to WiFi
-    Serial.println("Auto-connecting WiFi...");
+    showBootProgress(50, "Starting WiFi...");
     WiFiManager::autoConnect();
-
-    if (WiFiManager::isConnected()) {
-        showBootProgress(80, "WiFi connected");
-    } else {
-        showBootProgress(80, "WiFi offline");
-    }
-    delay(200);
+    showBootProgress(80, "WiFi: background");
+    delay(100);
 
     // Initialize homescreen
     showBootProgress(90, "Loading homescreen...");
@@ -197,6 +189,9 @@ void setup() {
 void loop() {
     // Update input
     Input::update();
+
+    // Progress async WiFi connect state machine
+    WiFiManager::update();
 
     // Check for sleep timeout
     unsigned long sleepMs = Input::getSleepTimeoutMs();

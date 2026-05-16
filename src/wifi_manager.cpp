@@ -10,6 +10,12 @@ char WiFiManager::savedPasswords[MAX_SAVED_NETWORKS][65] = {0};
 int WiFiManager::savedCount = 0;
 char WiFiManager::currentSSID[33] = {0};
 
+WiFiConnectState WiFiManager::connectState = WiFiConnectState::IDLE;
+int WiFiManager::connectingIndex = 0;
+unsigned long WiFiManager::attemptStart = 0;
+
+static const unsigned long PER_ATTEMPT_MS = 10000;
+
 void WiFiManager::init() {
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
@@ -93,6 +99,7 @@ bool WiFiManager::connect(const char* ssid, const char* password) {
 
     if (WiFi.status() == WL_CONNECTED) {
         strncpy(currentSSID, ssid, sizeof(currentSSID) - 1);
+        connectState = WiFiConnectState::CONNECTED;
         return true;
     }
 
@@ -102,19 +109,68 @@ bool WiFiManager::connect(const char* ssid, const char* password) {
 void WiFiManager::disconnect() {
     WiFi.disconnect();
     currentSSID[0] = '\0';
+    connectState = WiFiConnectState::IDLE;
 }
 
 bool WiFiManager::isConnected() {
     return WiFi.status() == WL_CONNECTED;
 }
 
-bool WiFiManager::autoConnect() {
-    for (int i = 0; i < savedCount; i++) {
-        if (connect(savedSSIDs[i], savedPasswords[i])) {
-            return true;
-        }
+void WiFiManager::beginAttempt(int index) {
+    WiFi.disconnect();
+    if (strlen(savedPasswords[index]) > 0) {
+        WiFi.begin(savedSSIDs[index], savedPasswords[index]);
+    } else {
+        WiFi.begin(savedSSIDs[index]);
     }
-    return false;
+}
+
+bool WiFiManager::autoConnect() {
+    if (savedCount == 0) {
+        connectState = WiFiConnectState::FAILED_ALL;
+        return false;
+    }
+    connectingIndex = 0;
+    beginAttempt(connectingIndex);
+    connectState = WiFiConnectState::CONNECTING;
+    attemptStart = millis();
+    return true;
+}
+
+void WiFiManager::update() {
+    if (connectState == WiFiConnectState::CONNECTED) {
+        if (WiFi.status() != WL_CONNECTED) {
+            connectState = WiFiConnectState::IDLE;
+            currentSSID[0] = '\0';
+        }
+        return;
+    }
+    if (connectState != WiFiConnectState::CONNECTING) return;
+
+    if (WiFi.status() == WL_CONNECTED) {
+        strncpy(currentSSID, savedSSIDs[connectingIndex], sizeof(currentSSID) - 1);
+        currentSSID[sizeof(currentSSID) - 1] = '\0';
+        connectState = WiFiConnectState::CONNECTED;
+        return;
+    }
+
+    if (millis() - attemptStart >= PER_ATTEMPT_MS) {
+        connectingIndex++;
+        if (connectingIndex >= savedCount) {
+            connectState = WiFiConnectState::FAILED_ALL;
+            return;
+        }
+        beginAttempt(connectingIndex);
+        attemptStart = millis();
+    }
+}
+
+WiFiConnectState WiFiManager::getConnectState() {
+    return connectState;
+}
+
+int WiFiManager::getConnectingIndex() {
+    return connectingIndex;
 }
 
 const char* WiFiManager::getSSID() {

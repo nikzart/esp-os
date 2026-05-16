@@ -14,6 +14,13 @@ struct WiFiNetwork {
     bool open;
 };
 
+enum class WiFiConnectState : uint8_t {
+    IDLE,
+    CONNECTING,
+    CONNECTED,
+    FAILED_ALL
+};
+
 class WiFiManager {
 public:
     static void init();
@@ -23,13 +30,18 @@ public:
     static WiFiNetwork* getScanResults();
     static int getScanCount();
 
-    // Connect to network
+    // Connect to network (blocking, used by Settings UI)
     static bool connect(const char* ssid, const char* password);
     static void disconnect();
     static bool isConnected();
 
-    // Auto-connect to saved network
+    // Auto-connect to saved networks (non-blocking; progresses via update())
     static bool autoConnect();
+
+    // Drive the async connect state machine; call from main loop()
+    static void update();
+    static WiFiConnectState getConnectState();
+    static int getConnectingIndex();
 
     // Get current connection info
     static const char* getSSID();
@@ -54,8 +66,13 @@ private:
     static int savedCount;
     static char currentSSID[33];
 
+    static WiFiConnectState connectState;
+    static int connectingIndex;
+    static unsigned long attemptStart;
+
     static void loadSavedNetworks();
     static void saveSavedNetworks();
+    static void beginAttempt(int index);
 };
 
 #endif
